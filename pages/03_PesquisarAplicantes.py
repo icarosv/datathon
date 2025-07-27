@@ -1,6 +1,7 @@
 import streamlit as st
-from utils.data_loader import load_applicants, get_applicant_by_id
+from utils.data_loader import _fetch_data_folder, load_applicants, get_applicant_by_id
 
+_fetch_data_folder()
 # Página de pesquisa de aplicantes pelo ID
 st.title("🔍 Pesquisar Aplicantes")
 st.markdown("Digite o **ID** do aplicante para visualizar seus detalhes armazenados.")
