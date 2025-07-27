@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.data_loader import load_raw_flat, get_raw_by_id
+from utils.data_loader import load_flat, get_flat_by_id
 
 # Página de pesquisa de vagas pelo ID
 st.title("🔍 Pesquisar Vagas (dados flat)")
@@ -14,7 +14,7 @@ st.markdown(
 csv_flat = "vagas_flat.csv"
 
 # Carregar dataset de vagas (flat)
-vagas_df = load_raw_flat(csv_flat)
+vagas_df = load_flat(csv_flat)
 
 if vagas_df.empty:
     st.error("Nenhuma vaga disponível no momento.")
@@ -37,7 +37,7 @@ else:
 
         # Botão para buscar vaga
         if st.button("Buscar Vaga"):
-            resultado = get_raw_by_id(csv_flat, vaga_id)
+            resultado = get_flat_by_id(csv_flat, vaga_id)
             if resultado.empty:
                 st.warning(f"Nenhuma vaga encontrada com ID **{vaga_id}**.")
             else:
