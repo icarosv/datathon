@@ -3,16 +3,11 @@ from pathlib import Path
 import streamlit as st
 import gdown
 
-# Diretório base do projeto
-BASE_DIR = Path(__file__).resolve().parents[1]
-
-# Onde a pasta inteira de dados será baixada e armazenada
-DATA_ROOT = BASE_DIR / "data"
+BASE_DIR      = Path(__file__).resolve().parents[1]
+DATA_ROOT     = BASE_DIR / "data"
 PROCESSED_DIR = DATA_ROOT / "processed"
-FLAT_DIR = DATA_ROOT / "flat"
-
-# Flag para não baixar repetidamente
-FETCH_FLAG = BASE_DIR / ".data_fetched"
+FLAT_DIR      = DATA_ROOT / "flat"
+FETCH_FLAG    = Path.home() / ".cache" / "datathon" / ".data_fetched"
 
 def _fetch_data_folder():
     if FETCH_FLAG.exists():
@@ -30,21 +25,24 @@ def _fetch_data_folder():
     except Exception as e:
         st.error(f"Erro ao baixar dados do Drive: {e}")
 
-
 def _safe_read_csv(path: Path, sep=";") -> pd.DataFrame:
-    """Lê um CSV verificando se o arquivo existe antes."""
     if not path.exists():
-        st.error(f"Arquivo de dados não encontrado: {path}")
+        st.error(f"Arquivo não encontrado: {path}")
         return pd.DataFrame()
-    return pd.read_csv(path, sep=sep)
-
+    try:
+        return pd.read_csv(path, sep=sep)
+    except pd.errors.ParserError:
+        return pd.read_csv(path)
 
 @st.cache_data(show_spinner=False)
-def load_vagas(csv_filename: str = "vagas.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de vagas, baixando do Drive se necessário."""
+def load_vagas() -> pd.DataFrame:
     _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / csv_filename)
+    return _safe_read_csv(PROCESSED_DIR / "vagas.csv")
 
+@st.cache_data(show_spinner=False)
+def load_flat(csv_filename: str) -> pd.DataFrame:
+    _fetch_data_folder()
+    return _safe_read_csv(FLAT_DIR / csv_filename)
 
 @st.cache_data(show_spinner=False)
 def load_applicants(csv_filename: str = "applicants.csv") -> pd.DataFrame:
@@ -76,15 +74,6 @@ def get_applicant_by_id(applicant_id: int, id_col: str = "id") -> pd.DataFrame:
     """Retorna o registro de aplicante com ID informado."""
     return get_record_by_id(load_applicants(), applicant_id, id_col)
 
-
-@st.cache_data(show_spinner=False)
-def load_flat(csv_filename: str) -> pd.DataFrame:
-    """
-    Carrega um CSV 'flat' diretamente da pasta data/flat,
-    baixando do Drive se necessário.
-    """
-    _fetch_data_folder()
-    return _safe_read_csv(FLAT_DIR / csv_filename)
 
 
 def get_flat_by_id(csv_filename: str, record_id: int, id_col: str = "id") -> pd.DataFrame:
