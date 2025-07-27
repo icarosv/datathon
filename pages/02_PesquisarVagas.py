@@ -1,6 +1,7 @@
 import streamlit as st
-from utils.data_loader import load_flat, get_flat_by_id
+from utils.data_loader import _fetch_data_folder, load_flat, get_flat_by_id
 
+_fetch_data_folder()
 # Página de pesquisa de vagas pelo ID
 st.title("🔍 Pesquisar Vagas (dados flat)")
 st.markdown(
