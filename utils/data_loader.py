@@ -20,17 +20,15 @@ def _fetch_data_folder():
     try:
         folder_id = st.secrets["drive"]["data_folder_id"]
     except KeyError:
-        st.warning("⚠️ `data_folder_id` não configurado em secrets.toml.")
+        st.warning("⚠️ `drive.data_folder_id` faltando em secrets.toml")
         return
-    # baixa a pasta inteira data/ no Drive
-    gdown.download_folder(
-        id=folder_id,
-        output=str(BASE_DIR),
-        quiet=True,
-        use_cookies=False,
-    )
-    FETCH_FLAG.write_text("ok")
-    st.write(BASE_DIR)
+
+    try:
+        gdown.download_folder(id=folder_id, output=str(BASE_DIR), quiet=True, use_cookies=False)
+        FETCH_FLAG.parent.mkdir(parents=True, exist_ok=True)
+        FETCH_FLAG.write_text("ok")
+    except Exception as e:
+        st.error(f"Erro ao baixar dados do Drive: {e}")
 
 
 def _safe_read_csv(path: Path, sep=";") -> pd.DataFrame:
