@@ -104,4 +104,6 @@ def get_flat_by_id(csv_filename: str, record_id: int, id_col: str = "id") -> pd.
 def load_processed_dataset(filename: str = "dataset_for_model.csv") -> pd.DataFrame:
     """Carrega o dataset completo pronto para modelo."""
     _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / filename)
+        path = PROCESSED_DIR / filename
+    # índice original estava sendo gravado como primeira coluna
+    return pd.read_csv(path, sep=";", index_col=0)
