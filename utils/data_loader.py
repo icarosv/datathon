@@ -102,8 +102,16 @@ def get_flat_by_id(csv_filename: str, record_id: int, id_col: str = "id") -> pd.
 
 @st.cache_data(show_spinner=False)
 def load_processed_dataset(filename: str = "dataset_for_model.csv") -> pd.DataFrame:
-    """Carrega o dataset completo pronto para modelo."""
-    _fetch_data_folder()
-        path = PROCESSED_DIR / filename
-    # índice original estava sendo gravado como primeira coluna
+    """
+    Carrega o dataset pronto para o modelo, com índice e colunas corretas.
+    """
+    # Se você estiver usando fetch do Drive, descomente a próxima linha:
+    # _fetch_data_folder()
+
+    path = PROCESSED_DIR / filename
+    if not path.exists():
+        st.error(f"Arquivo de dataset para modelo não encontrado: {path}")
+        return pd.DataFrame()
+
+    # Lê usando o índice salvo (coluna 0) e separador ';'
     return pd.read_csv(path, sep=";", index_col=0)
