@@ -10,10 +10,10 @@ FLAT_DIR      = DATA_ROOT / "flat"
 FETCH_FLAG    = Path.home() / ".cache" / "datathon" / ".data_fetched"
 
 def _fetch_data_folder():
-    # 1) garante que o cache de pasta exista
-    DATA_ROOT.mkdir(exist_ok=True, parents=True)
-    FLAT_DIR.mkdir(exist_ok=True, parents=True)
-    PROCESSED_DIR.mkdir(exist_ok=True, parents=True)
+    # 1) cria as pastas antes de baixar
+    DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    FLAT_DIR.mkdir(parents=True, exist_ok=True)
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     if FETCH_FLAG.exists():
         return
@@ -25,19 +25,19 @@ def _fetch_data_folder():
         return
 
     try:
-        # 2) baixe direto para data/
+        # joga tudo dentro de data/
         gdown.download_folder(
             id=folder_id,
             output=str(DATA_ROOT),
-            quiet=False,       # deixe False só para ver log na primeira vez
+            quiet=False,        # false só na primeira vez pra ver o log
             use_cookies=False,
         )
 
-        # 3) opcional: debug da árvore
+        # opcional: debug visual da árvore de arquivos
         for p in sorted(DATA_ROOT.rglob("*")):
             st.write("📄", p.relative_to(BASE_DIR))
 
-        # 4) marca que já buscamos uma vez
+        # marca que já baixou
         FETCH_FLAG.parent.mkdir(parents=True, exist_ok=True)
         FETCH_FLAG.write_text("ok")
     except Exception as e:
@@ -50,8 +50,15 @@ def load_vagas() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_flat(csv_filename: str) -> pd.DataFrame:
-    _fetch_data_folder()
-    return _safe_read_csv(FLAT_DIR / csv_filename)
+    path = FLAT_DIR / csv_filename
+    if not path.exists():
+        st.error(f"Arquivo não encontrado: {path}")
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path, sep=";")
+    except Exception as e:
+        st.error(f"Erro ao ler {csv_filename}: {e}")
+        return pd.DataFrame()
 
 @st.cache_data(show_spinner=False)
 def load_applicants(csv_filename: str = "applicants.csv") -> pd.DataFrame:
