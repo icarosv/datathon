@@ -5,6 +5,7 @@ from pathlib import Path
 from utils.predictor import rank_applicants_for_vaga
 from utils.data_loader import load_processed_dataset
 
+df_features = load_processed_dataset()
 # Configuração inicial
 st.set_page_config(page_title="Predição de Ranking", layout="wide")
 
