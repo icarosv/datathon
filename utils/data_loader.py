@@ -30,7 +30,7 @@ def _fetch_data_folder():
         use_cookies=False,
     )
     FETCH_FLAG.write_text("ok")
-        st.write(BASE_DIR)
+    #st.write(BASE_DIR)
 
 
 def _safe_read_csv(path: Path, sep=";") -> pd.DataFrame:
