@@ -1,19 +1,20 @@
 import pandas as pd
-from pathlib import Path
 import streamlit as st
 import gdown
+from pathlib import Path
 
+# ─── Constantes de diretórios ─────────────────────────────────────────────────
 BASE_DIR      = Path(__file__).resolve().parents[1]
 DATA_ROOT     = BASE_DIR / "data"
 PROCESSED_DIR = DATA_ROOT / "processed"
 FLAT_DIR      = DATA_ROOT / "flat"
 FETCH_FLAG    = Path.home() / ".cache" / "datathon" / ".data_fetched"
 
+# ─── Função de download dos dados ───────────────────────────────────────────────
 def _fetch_data_folder():
-    # 1) cria as pastas antes de baixar
-    DATA_ROOT.mkdir(parents=True, exist_ok=True)
-    FLAT_DIR.mkdir(parents=True, exist_ok=True)
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    # Garante existência das pastas
+    for d in (DATA_ROOT, FLAT_DIR, PROCESSED_DIR):
+        d.mkdir(parents=True, exist_ok=True)
 
     if FETCH_FLAG.exists():
         return
@@ -25,93 +26,76 @@ def _fetch_data_folder():
         return
 
     try:
-        # joga tudo dentro de data/
+        # Baixa toda a estrutura dentro de data/
         gdown.download_folder(
             id=folder_id,
             output=str(DATA_ROOT),
-            quiet=False,        # false só na primeira vez pra ver o log
+            quiet=False,
             use_cookies=False,
         )
-
-        # opcional: debug visual da árvore de arquivos
-        for p in sorted(DATA_ROOT.rglob("*")):
-            st.write("📄", p.relative_to(BASE_DIR))
-
-        # marca que já baixou
+        # Marca que o download já ocorreu
         FETCH_FLAG.parent.mkdir(parents=True, exist_ok=True)
         FETCH_FLAG.write_text("ok")
     except Exception as e:
         st.error(f"Erro ao baixar dados do Drive: {e}")
 
-@st.cache_data(show_spinner=False)
-def load_vagas() -> pd.DataFrame:
-    _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / "vagas.csv")
+# Dispara o download na importação do módulo
+_fetch_data_folder()
 
-@st.cache_data(show_spinner=False)
-def load_flat(csv_filename: str) -> pd.DataFrame:
-    path = FLAT_DIR / csv_filename
+# ─── Helper seguro para leitura de CSV ─────────────────────────────────────────
+def _safe_read_csv(path: Path, sep: str = ";") -> pd.DataFrame:
     if not path.exists():
         st.error(f"Arquivo não encontrado: {path}")
         return pd.DataFrame()
     try:
-        return pd.read_csv(path, sep=";")
-    except Exception as e:
-        st.error(f"Erro ao ler {csv_filename}: {e}")
-        return pd.DataFrame()
+        return pd.read_csv(path, sep=sep)
+    except pd.errors.ParserError:
+        return pd.read_csv(path)
+
+# ─── Funções de carregamento com cache ──────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def load_vagas(csv_filename: str = "vagas.csv") -> pd.DataFrame:
+    path = PROCESSED_DIR / csv_filename
+    return _safe_read_csv(path)
 
 @st.cache_data(show_spinner=False)
 def load_applicants(csv_filename: str = "applicants.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de aplicantes, baixando do Drive se necessário."""
-    _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / csv_filename)
-
+    path = PROCESSED_DIR / csv_filename
+    return _safe_read_csv(path)
 
 @st.cache_data(show_spinner=False)
 def load_prospects(csv_filename: str = "prospects.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de prospects processados."""
-    _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / csv_filename)
+    path = PROCESSED_DIR / csv_filename
+    return _safe_read_csv(path)
 
+@st.cache_data(show_spinner=False)
+def load_flat(csv_filename: str) -> pd.DataFrame:
+    path = FLAT_DIR / csv_filename
+    return _safe_read_csv(path)
 
+@st.cache_data(show_spinner=False)
+def load_processed_dataset(filename: str = "dataset_for_model.csv") -> pd.DataFrame:
+    path = PROCESSED_DIR / filename
+    df = _safe_read_csv(path)
+    if not df.empty:
+        # Ajusta coluna de índice
+        df.set_index(df.columns[0], inplace=True)
+    return df
+
+# ─── Funções auxiliares para busca por ID ───────────────────────────────────────
 def get_record_by_id(df: pd.DataFrame, record_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Retorna as linhas do DataFrame onde id_col == record_id."""
     if df.empty:
         return pd.DataFrame()
     return df[df[id_col] == record_id]
 
 
 def get_vaga_by_id(vaga_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Retorna o registro de vaga com ID informado."""
     return get_record_by_id(load_vagas(), vaga_id, id_col)
 
 
 def get_applicant_by_id(applicant_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Retorna o registro de aplicante com ID informado."""
     return get_record_by_id(load_applicants(), applicant_id, id_col)
 
 
-
 def get_flat_by_id(csv_filename: str, record_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Busca um registro específico em um CSV flat."""
-    df = load_flat(csv_filename)
-    if df.empty:
-        return df
-    return df[df[id_col] == record_id]
-
-
-@st.cache_data(show_spinner=False)
-def load_processed_dataset(filename: str = "dataset_for_model.csv") -> pd.DataFrame:
-    """
-    Carrega o dataset pronto para o modelo, com índice e colunas corretas.
-    """
-    # Se você estiver usando fetch do Drive, descomente a próxima linha:
-    # _fetch_data_folder()
-
-    path = PROCESSED_DIR / filename
-    if not path.exists():
-        st.error(f"Arquivo de dataset para modelo não encontrado: {path}")
-        return pd.DataFrame()
-
-    # Lê usando o índice salvo (coluna 0) e separador ';'
-    return pd.read_csv(path, sep=";", index_col=0)
+    return get_record_by_id(load_flat(csv_filename), record_id, id_col)
