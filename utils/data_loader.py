@@ -10,8 +10,14 @@ FLAT_DIR      = DATA_ROOT / "flat"
 FETCH_FLAG    = Path.home() / ".cache" / "datathon" / ".data_fetched"
 
 def _fetch_data_folder():
+    # 1) garante que o cache de pasta exista
+    DATA_ROOT.mkdir(exist_ok=True, parents=True)
+    FLAT_DIR.mkdir(exist_ok=True, parents=True)
+    PROCESSED_DIR.mkdir(exist_ok=True, parents=True)
+
     if FETCH_FLAG.exists():
         return
+
     try:
         folder_id = st.secrets["drive"]["data_folder_id"]
     except KeyError:
@@ -19,20 +25,23 @@ def _fetch_data_folder():
         return
 
     try:
-        gdown.download_folder(id=folder_id, output=str(BASE_DIR), quiet=True, use_cookies=False)
+        # 2) baixe direto para data/
+        gdown.download_folder(
+            id=folder_id,
+            output=str(DATA_ROOT),
+            quiet=False,       # deixe False só para ver log na primeira vez
+            use_cookies=False,
+        )
+
+        # 3) opcional: debug da árvore
+        for p in sorted(DATA_ROOT.rglob("*")):
+            st.write("📄", p.relative_to(BASE_DIR))
+
+        # 4) marca que já buscamos uma vez
         FETCH_FLAG.parent.mkdir(parents=True, exist_ok=True)
         FETCH_FLAG.write_text("ok")
     except Exception as e:
         st.error(f"Erro ao baixar dados do Drive: {e}")
-
-def _safe_read_csv(path: Path, sep=";") -> pd.DataFrame:
-    if not path.exists():
-        st.error(f"Arquivo não encontrado: {path}")
-        return pd.DataFrame()
-    try:
-        return pd.read_csv(path, sep=sep)
-    except pd.errors.ParserError:
-        return pd.read_csv(path)
 
 @st.cache_data(show_spinner=False)
 def load_vagas() -> pd.DataFrame:
