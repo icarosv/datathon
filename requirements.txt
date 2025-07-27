@@ -9,3 +9,4 @@ streamlit==1.47.1
 torch==2.7.1
 tqdm==4.67.1
 xgboost==3.0.2
+gdown==5.2.0

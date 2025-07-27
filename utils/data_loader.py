@@ -1,99 +1,107 @@
 import pandas as pd
 from pathlib import Path
 import streamlit as st
+import gdown
 
-# Diretório base onde estão os dados processados
+# Diretório base do projeto
 BASE_DIR = Path(__file__).resolve().parents[1]
-DATA_DIR = BASE_DIR / "data" / "processed"
-FLAT_DIR = BASE_DIR / "data" / "flat"
 
-def _safe_read_csv(path: Path) -> pd.DataFrame:
+# Onde a pasta inteira de dados será baixada e armazenada
+DATA_ROOT = BASE_DIR / "data"
+PROCESSED_DIR = DATA_ROOT / "processed"
+FLAT_DIR = DATA_ROOT / "flat"
+
+# Flag para não baixar repetidamente
+FETCH_FLAG = BASE_DIR / ".data_fetched"
+
+def _fetch_data_folder():
+    """
+    Baixa toda a pasta data/ do Google Drive (via gdown) uma única vez.
+    A URL da pasta deve estar em st.secrets["drive"]["data_folder_url"].
+    """
+    if not FETCH_FLAG.exists():
+        try:
+            folder_url = st.secrets["drive"]["data_folder_url"]
+        except Exception:
+            st.warning("Drive folder URL não configurada em secrets.toml.")
+            return
+
+        # gdown.download_folder preserva a estrutura interna da pasta
+        gdown.download_folder(
+            url=folder_url,
+            output=str(BASE_DIR),
+            quiet=True,
+            use_cookies=False
+        )
+        FETCH_FLAG.write_text("fetched")
+
+
+def _safe_read_csv(path: Path, sep=";") -> pd.DataFrame:
     """Lê um CSV verificando se o arquivo existe antes."""
     if not path.exists():
         st.error(f"Arquivo de dados não encontrado: {path}")
         return pd.DataFrame()
-    return pd.read_csv(path,  sep=';')
+    return pd.read_csv(path, sep=sep)
 
 
 @st.cache_data(show_spinner=False)
 def load_vagas(csv_filename: str = "vagas.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de vagas."""
-    return _safe_read_csv(DATA_DIR / csv_filename)
+    """Carrega o DataFrame de vagas, baixando do Drive se necessário."""
+    _fetch_data_folder()
+    return _safe_read_csv(PROCESSED_DIR / csv_filename)
 
 
 @st.cache_data(show_spinner=False)
 def load_applicants(csv_filename: str = "applicants.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de aplicantes."""
-    return _safe_read_csv(DATA_DIR / csv_filename)
+    """Carrega o DataFrame de aplicantes, baixando do Drive se necessário."""
+    _fetch_data_folder()
+    return _safe_read_csv(PROCESSED_DIR / csv_filename)
+
+
+@st.cache_data(show_spinner=False)
+def load_prospects(csv_filename: str = "prospects.csv") -> pd.DataFrame:
+    """Carrega o DataFrame de prospects processados."""
+    _fetch_data_folder()
+    return _safe_read_csv(PROCESSED_DIR / csv_filename)
 
 
 def get_record_by_id(df: pd.DataFrame, record_id: int, id_col: str = "id") -> pd.DataFrame:
-    """
-    Retorna as linhas do DataFrame onde a coluna id_col corresponde ao record_id.
-    """
+    """Retorna as linhas do DataFrame onde id_col == record_id."""
     if df.empty:
         return pd.DataFrame()
     return df[df[id_col] == record_id]
 
 
 def get_vaga_by_id(vaga_id: int, id_col: str = "id") -> pd.DataFrame:
-    """
-    Retorna a vaga com o ID informado.
-    """
+    """Retorna o registro de vaga com ID informado."""
     return get_record_by_id(load_vagas(), vaga_id, id_col)
 
 
 def get_applicant_by_id(applicant_id: int, id_col: str = "id") -> pd.DataFrame:
-    """
-    Retorna o aplicante com o ID informado.
-    """
+    """Retorna o registro de aplicante com ID informado."""
     return get_record_by_id(load_applicants(), applicant_id, id_col)
 
+
 @st.cache_data(show_spinner=False)
-def load_flat_flat(csv_filename: str) -> pd.DataFrame:
+def load_flat(csv_filename: str) -> pd.DataFrame:
     """
-    Carrega um CSV 'flat' diretamente da pasta data/raw/.
-    Ideal para inspecionar dados originais exportados de JSON/ZIP.
+    Carrega um CSV 'flat' diretamente da pasta data/flat,
+    baixando do Drive se necessário.
     """
+    _fetch_data_folder()
     return _safe_read_csv(FLAT_DIR / csv_filename)
 
 
 def get_flat_by_id(csv_filename: str, record_id: int, id_col: str = "id") -> pd.DataFrame:
-    """
-    Busca um registro específico em um CSV raw (não processado).
-    """
-    df = load_flat_flat(csv_filename)
+    """Busca um registro específico em um CSV flat."""
+    df = load_flat(csv_filename)
     if df.empty:
         return df
     return df[df[id_col] == record_id]
 
 
 @st.cache_data(show_spinner=False)
-def load_raw_flat(csv_filename: str) -> pd.DataFrame:
-    """
-    Carrega um CSV 'flat' diretamente da pasta data/flat.
-    """
-    path = FLAT_DIR / csv_filename
-    if not path.exists():
-        st.error(f"Arquivo flat não encontrado: {path}")
-        return pd.DataFrame()
-    # Detecta separador (a maioria será ;)
-    try:
-        return pd.read_csv(path, sep=';')
-    except Exception:
-        return pd.read_csv(path)
-
-
-def get_raw_by_id(csv_filename: str, record_id: int, id_col: str = "id") -> pd.DataFrame:
-    """
-    Busca um registro específico em um CSV flat (não processado).
-    """
-    df = load_raw_flat(csv_filename)
-    if df.empty:
-        return df
-    return df[df[id_col] == record_id]
-
-@st.cache_data
 def load_processed_dataset(filename: str = "dataset_for_model.csv") -> pd.DataFrame:
-    path = DATA_DIR / filename
-    return pd.read_csv(path, sep=";")
+    """Carrega o dataset completo pronto para modelo."""
+    _fetch_data_folder()
+    return _safe_read_csv(PROCESSED_DIR / filename)
