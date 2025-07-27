@@ -15,25 +15,21 @@ FLAT_DIR = DATA_ROOT / "flat"
 FETCH_FLAG = BASE_DIR / ".data_fetched"
 
 def _fetch_data_folder():
-    """
-    Baixa toda a pasta data/ do Google Drive (via gdown) uma única vez.
-    A URL da pasta deve estar em st.secrets["drive"]["data_folder_url"].
-    """
-    if not FETCH_FLAG.exists():
-        try:
-            folder_url = st.secrets["drive"]["data_folder_url"]
-        except Exception:
-            st.warning("Drive folder URL não configurada em secrets.toml.")
-            return
-
-        # gdown.download_folder preserva a estrutura interna da pasta
-        gdown.download_folder(
-            url=folder_url,
-            output=str(BASE_DIR),
-            quiet=True,
-            use_cookies=False
-        )
-        FETCH_FLAG.write_text("fetched")
+    if FETCH_FLAG.exists():
+        return
+    try:
+        folder_id = st.secrets["drive"]["data_folder_id"]
+    except KeyError:
+        st.warning("⚠️ `data_folder_id` não configurado em secrets.toml.")
+        return
+    # baixa a pasta inteira data/ no Drive
+    gdown.download_folder(
+        id=folder_id,
+        output=str(BASE_DIR),
+        quiet=True,
+        use_cookies=False,
+    )
+    FETCH_FLAG.write_text("ok")
         st.write(BASE_DIR)
 
 
