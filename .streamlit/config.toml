@@ -1,0 +1,25 @@
+[global]
+title = "Dashboard de Avaliação de Candidatos"
+
+[theme]
+# Tema claro, clean e minimalista
+base = "light"
+primaryColor = "#222222"              # Preto suave para combinar com o logo
+backgroundColor = "#FFFFFF"           # Fundo branco puro
+secondaryBackgroundColor = "#F7F7F7" # Leve cinza para blocos de conteúdo
+textColor = "#000000"                 # Texto preto
+font = "sans serif"
+
+[server]
+headless = true
+port = 8501
+enableCORS = false
+
+[runner]
+magicEnabled = false
+
+[client]
+showErrorDetails = true
+
+[ui]
+layout = "wide"
