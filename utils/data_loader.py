@@ -4,7 +4,7 @@ import streamlit as st
 import gdown
 
 # Diretório base do projeto
-BASE_DIR = Path(__file__).resolve().parents[1]
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 # Onde a pasta inteira de dados será baixada e armazenada
 DATA_ROOT = BASE_DIR / "data"
