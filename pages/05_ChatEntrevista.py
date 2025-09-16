@@ -2,8 +2,9 @@ import streamlit as st
 from pathlib import Path
 import google.generativeai as genai
 
-from utils.data_loader import get_applicant_by_id, get_vaga_by_id
+from utils.data_loader import _fetch_data_folder, get_applicant_by_id, get_vaga_by_id
 
+_fetch_data_folder()
 # =====================
 # Configuração Gemini
 # =====================

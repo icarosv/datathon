@@ -65,48 +65,43 @@ def rank_applicants_for_vaga(
     Retorna um ranking de candidatos para a vaga especificada.
     O score é a probabilidade da classe positiva.
     """
-    # Filtrar registros dessa vaga
+    # 1) Filtra apenas registros da vaga
     df = df_features[df_features["id_vaga"] == vaga_id].copy()
     if df.empty:
         return df
 
-    # Guardar ids para retorno final
+    # 2) Armazena ids para retornar depois
     ids = df[["id_vaga", "id_applicant"]].copy()
 
-    # Remove coluna 'classificacao' se existir
-    if "classificacao" in df.columns:
-        df = df.drop(columns=["classificacao"])
+    # 3) Remove o target, se presente
+    df = df.drop(columns=["classificacao"], errors="ignore")
 
-    # Conversão de colunas não numéricas
-    for col in df.columns:
-        if df[col].dtype == "object":
-            try:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-            except Exception:
-                df[col] = (
-                    df[col]
-                    .astype(str)
-                    .str.strip()
-                    .str.lower()
-                    .map({"true": 1, "false": 0, "sim": 1, "não": 0})
-                ).fillna(0)
+    # 4) Monta X excluindo colunas de id
+    X = df.drop(columns=["id_vaga", "id_applicant"], errors="ignore")
 
-    # Substitui NaN por 0
-    df = df.fillna(0)
+    # ─────────────────────────────────────────────────────────────────────────────
+    # 5) Forçar TODAS as colunas para numérico, preencher NaN com 0
+    X = X.apply(pd.to_numeric, errors="coerce").fillna(0)
+    # ─────────────────────────────────────────────────────────────────────────────
 
-    # Conjunto de features
-    X = df.drop(["id_vaga", "id_applicant"], axis=1)
-
-    # Calcular probabilidades
+    # 6) Gera probabilidades
     proba_df = predict_proba(X)
 
-    score_col = "prob_1"
+    # 7) Traduz o positive_class ("positiva") pro índice numérico via o LabelEncoder
+    le = load_label_encoder()
+    try:
+        positive_idx = le.transform([positive_class])[0]
+    except Exception:
+        # se o usuário passar "1" ou similar diretamente
+        positive_idx = int(positive_class)
+
+    score_col = f"prob_{positive_idx}"
     if score_col not in proba_df.columns:
-        model = load_model()
         raise ValueError(
-            f"Classe positiva '{positive_class}' não encontrada no modelo. "
-            f"Classes disponíveis: {list(model.classes_)}"
+            f"Classe positiva '{positive_class}' não encontrada. "
+            f"Model.classes_ = {list(le.classes_)}"
         )
 
+    # 8) Anexa o score e ordena
     ids["score"] = proba_df[score_col].values
     return ids.sort_values("score", ascending=False).head(top_n)

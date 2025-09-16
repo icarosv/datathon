@@ -1,107 +1,101 @@
 import pandas as pd
-from pathlib import Path
 import streamlit as st
 import gdown
+from pathlib import Path
 
-# Diretório base do projeto
-BASE_DIR = Path(__file__).resolve().parents[1]
-
-# Onde a pasta inteira de dados será baixada e armazenada
-DATA_ROOT = BASE_DIR / "data"
+# ─── Constantes de diretórios ─────────────────────────────────────────────────
+BASE_DIR      = Path(__file__).resolve().parents[1]
+DATA_ROOT     = BASE_DIR / "data"
 PROCESSED_DIR = DATA_ROOT / "processed"
-FLAT_DIR = DATA_ROOT / "flat"
+FLAT_DIR      = DATA_ROOT / "flat"
+FETCH_FLAG    = Path.home() / ".cache" / "datathon" / ".data_fetched"
 
-# Flag para não baixar repetidamente
-FETCH_FLAG = BASE_DIR / ".data_fetched"
-
+# ─── Função de download dos dados ───────────────────────────────────────────────
 def _fetch_data_folder():
-    """
-    Baixa toda a pasta data/ do Google Drive (via gdown) uma única vez.
-    A URL da pasta deve estar em st.secrets["drive"]["data_folder_url"].
-    """
-    if not FETCH_FLAG.exists():
-        try:
-            folder_url = st.secrets["drive"]["data_folder_url"]
-        except Exception:
-            st.warning("Drive folder URL não configurada em secrets.toml.")
-            return
+    # Garante existência das pastas
+    for d in (DATA_ROOT, FLAT_DIR, PROCESSED_DIR):
+        d.mkdir(parents=True, exist_ok=True)
 
-        # gdown.download_folder preserva a estrutura interna da pasta
+    if FETCH_FLAG.exists():
+        return
+
+    try:
+        folder_id = st.secrets["drive"]["data_folder_id"]
+    except KeyError:
+        st.warning("⚠️ `drive.data_folder_id` faltando em secrets.toml")
+        return
+
+    try:
+        # Baixa toda a estrutura dentro de data/
         gdown.download_folder(
-            url=folder_url,
-            output=str(BASE_DIR),
-            quiet=True,
-            use_cookies=False
+            id=folder_id,
+            output=str(DATA_ROOT),
+            quiet=False,
+            use_cookies=False,
         )
-        FETCH_FLAG.write_text("fetched")
+        # Marca que o download já ocorreu
+        FETCH_FLAG.parent.mkdir(parents=True, exist_ok=True)
+        FETCH_FLAG.write_text("ok")
+    except Exception as e:
+        st.error(f"Erro ao baixar dados do Drive: {e}")
 
+# Dispara o download na importação do módulo
+_fetch_data_folder()
 
-def _safe_read_csv(path: Path, sep=";") -> pd.DataFrame:
-    """Lê um CSV verificando se o arquivo existe antes."""
+# ─── Helper seguro para leitura de CSV ─────────────────────────────────────────
+def _safe_read_csv(path: Path, sep: str = ";") -> pd.DataFrame:
     if not path.exists():
-        st.error(f"Arquivo de dados não encontrado: {path}")
+        st.error(f"Arquivo não encontrado: {path}")
         return pd.DataFrame()
-    return pd.read_csv(path, sep=sep)
+    try:
+        return pd.read_csv(path, sep=sep)
+    except pd.errors.ParserError:
+        return pd.read_csv(path)
 
-
+# ─── Funções de carregamento com cache ──────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def load_vagas(csv_filename: str = "vagas.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de vagas, baixando do Drive se necessário."""
-    _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / csv_filename)
-
+    path = PROCESSED_DIR / csv_filename
+    return _safe_read_csv(path)
 
 @st.cache_data(show_spinner=False)
 def load_applicants(csv_filename: str = "applicants.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de aplicantes, baixando do Drive se necessário."""
-    _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / csv_filename)
-
+    path = PROCESSED_DIR / csv_filename
+    return _safe_read_csv(path)
 
 @st.cache_data(show_spinner=False)
 def load_prospects(csv_filename: str = "prospects.csv") -> pd.DataFrame:
-    """Carrega o DataFrame de prospects processados."""
-    _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / csv_filename)
+    path = PROCESSED_DIR / csv_filename
+    return _safe_read_csv(path)
 
+@st.cache_data(show_spinner=False)
+def load_flat(csv_filename: str) -> pd.DataFrame:
+    path = FLAT_DIR / csv_filename
+    return _safe_read_csv(path)
 
+@st.cache_data(show_spinner=False)
+def load_processed_dataset(filename: str = "dataset_for_model.csv") -> pd.DataFrame:
+    path = PROCESSED_DIR / filename
+    df = _safe_read_csv(path)
+    if not df.empty:
+        # Ajusta coluna de índice
+        df.set_index(df.columns[0], inplace=True)
+    return df
+
+# ─── Funções auxiliares para busca por ID ───────────────────────────────────────
 def get_record_by_id(df: pd.DataFrame, record_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Retorna as linhas do DataFrame onde id_col == record_id."""
     if df.empty:
         return pd.DataFrame()
     return df[df[id_col] == record_id]
 
 
 def get_vaga_by_id(vaga_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Retorna o registro de vaga com ID informado."""
     return get_record_by_id(load_vagas(), vaga_id, id_col)
 
 
 def get_applicant_by_id(applicant_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Retorna o registro de aplicante com ID informado."""
     return get_record_by_id(load_applicants(), applicant_id, id_col)
 
 
-@st.cache_data(show_spinner=False)
-def load_flat(csv_filename: str) -> pd.DataFrame:
-    """
-    Carrega um CSV 'flat' diretamente da pasta data/flat,
-    baixando do Drive se necessário.
-    """
-    _fetch_data_folder()
-    return _safe_read_csv(FLAT_DIR / csv_filename)
-
-
 def get_flat_by_id(csv_filename: str, record_id: int, id_col: str = "id") -> pd.DataFrame:
-    """Busca um registro específico em um CSV flat."""
-    df = load_flat(csv_filename)
-    if df.empty:
-        return df
-    return df[df[id_col] == record_id]
-
-
-@st.cache_data(show_spinner=False)
-def load_processed_dataset(filename: str = "dataset_for_model.csv") -> pd.DataFrame:
-    """Carrega o dataset completo pronto para modelo."""
-    _fetch_data_folder()
-    return _safe_read_csv(PROCESSED_DIR / filename)
+    return get_record_by_id(load_flat(csv_filename), record_id, id_col)
